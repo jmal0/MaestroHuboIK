@@ -1,12 +1,11 @@
-%syms SP SR SY EP;
 classdef Arm < Limb
     properties (Constant)
     	RIGHT = 1;
     	LEFT = 0;
     	% Limb lengths
-    	UPPER_ARM_X = ;
-    	UPPER_ARM_Z = ;
-    	LOWER_ARM = ;
+    	UPPER_ARM_X = .02;
+    	UPPER_ARM_Z = .182;
+    	LOWER_ARM = .1655;
 	end
 
 	properties
@@ -33,7 +32,7 @@ classdef Arm < Limb
             % Shoulder roll to shoulder yaw transform
             A_2 = [	-sin(SR),	0,	-cos(SR),	0;...
             		cos(SR),	0,	-sin(SR),	0;...
-            		0,			-1,	0,			0]...
+            		0,			-1,	0,			0;...
             		0,			0,	0,			1];
             % Shoulder yaw to elbow pitch transform
             A_3 = [	sin(SY),	0,	cos(SY),	Leg.UPPER_ARM_X*sin(SY);...
@@ -47,7 +46,23 @@ classdef Arm < Limb
             		0,			0,			0,	1];
             arm.T_14 = symfun(A_1*A_2*A_3*A_4, [SP SR SY EP])
 
-            arm.joints = ['RSP';'RSR';'RSY';'REP'];
+            arm.joints = cellstr(['RSP';'RSR';'RSY';'REP']);
 
-		end
+        end
+
+        function [x,y,z] = getXYZ(arm, data)
+            pitch = xyzData(1);
+            roll = xyzData(2);
+            yaw = xyzData(3);
+            elbow = xyzData(4);
+            t = arm.T_04(pitch, roll, yaw, elbow);
+            end
+            x = eval(t(1,4));
+            y = eval(t(2,4));
+            z = eval(t(3,4));
+        end
+
+        function jointData = setXYZ(arm, xyzData)
+            jointData = [0,0,0,0];
 	end
+end

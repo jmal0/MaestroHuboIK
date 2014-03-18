@@ -1,4 +1,3 @@
-%syms HY HR HP KP;
 classdef Leg < Limb
     properties (Constant)
         RIGHT = 1;
