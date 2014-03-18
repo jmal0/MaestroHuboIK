@@ -1,5 +1,5 @@
 %syms HY HR HP KP;
-classdef Leg
+classdef Leg < Limb
     properties (Constant)
         RIGHT = 1;
         LEFT = 0;
@@ -27,14 +27,12 @@ classdef Leg
         % Determines whether coordinate system is in hip roll refernce
         % frame (Rainbow style) or hip yaw reference frame
         frame;
-        % Controlled joint names
-        joints = [];
         % Forward transformation matrices
         T_04; % Hip yaw to ankle pitch
         T_14; % Hip roll to ankle pitch
         % Inverse transformation matrices
-        T_40; % Ankle pitch to hip yaw
-        T_41; % Ankle pitch to hip roll
+        %T_40; % Ankle pitch to hip yaw
+        %T_41; % Ankle pitch to hip roll
     end
     
     methods
@@ -58,13 +56,13 @@ classdef Leg
             % Knee Pitch to ankle pitch transform
             A_4 = [cos(KP),-sin(KP),0,Leg.CALF*cos(KP);sin(KP),cos(KP),0,Leg.CALF*sin(KP);0,0,1,0;0,0,0,1];
             % Transform from hip roll to ankle pitch reference frame
-            leg.T_14 = A_2*A_3*A_4;
+            leg.T_14 = symfun(A_2*A_3*A_4, [HR HP KP]);
             % Transform from hip yaw to ankle pitch reference frame
-            leg.T_04  = A_1*leg.T_14;
+            leg.T_04 = symfun(A_1*leg.T_14, [HY HR HP KP]);
             
             % I should learn how to use these
-            leg.T_41 = inv(leg.T_14);
-            leg.T_40 = inv(leg.T_04);
+            %leg.T_41 = inv(leg.T_14);
+            %leg.T_40 = inv(leg.T_04);
             
             if which
                 leg.joints = ['RHY';'RHR';'RHP';'RKP';'RAP';'RAR'];
@@ -76,19 +74,27 @@ classdef Leg
         
         % Calculate foot xyz position from joint angles using leg
         % transformation matrices
-        function [x, y, z] = getXYZ(leg, yaw, roll, pitch, knee)
+        function [x, y, z] = getXYZ(leg, xyzData)
+            yaw = xyzData(1);
+            roll = xyzData(2);
+            pitch = xyzData(3);
+            knee = xyzData(4);
             if(leg.frame)
                 t = leg.T_14(roll, pitch, knee);
             else
-                t = leg.t_04(yaw, roll, pitch, knee);
+                t = leg.T_04(yaw, roll, pitch, knee);
             end
-            x = t(0,3);
-            y = t(1,3);
-            z = t(2,3);
+            x = eval(t(3,4)); % X and Z axes are flipped
+            y = eval(t(2,4));
+            z = eval(t(1,4)); % X and Z axes are flipped
         end
         
         % A geometric IK solution for Hubo's leg, credit to KAIST
-        function data = setXYZ(leg, x, y, z, yaw)
+        function jointData = setXYZ(leg, xyzData)
+            x = xyzData(1);
+            y = xyzData(2);
+            z = xyzData(3);
+            yaw = xyzData(4);
             if(leg.frame)
                 % Coordinates given in hip yaw reference frame. Convert to
                 % hip roll reference frame before solving
@@ -97,8 +103,7 @@ classdef Leg
             end
             radius = sqrt(x^2 + y^2 + z^2);
             if(radius > Leg.THIGH + Leg.CALF)
-                data = NaN;
-                return;
+                error('myApp:argChk','Position out of reach');
             end
             HY = yaw;
             KP = pi - acos((Leg.THIGH^2 + Leg.CALF^2 - radius^2)/ (2*Leg.THIGH*Leg.CALF));
@@ -108,11 +113,10 @@ classdef Leg
             AR = -HR;
             % Check that computed joint angles are within joint limits
             if(HY<Leg.HY_L || HY>Leg.HY_U || HR<Leg.HR_L || HR>Leg.HR_U || HP<Leg.HP_L || HP>Leg.HP_U || KP<Leg.KP_L || KP>Leg.KP_U || AP<Leg.AP_L || AP>Leg.AP_U || AR<Leg.AR_L || AR>Leg.AR_U)
-                data = Nan;
-                return;
+                error('myApp:argChk','One or more joint angle out of range')
             end
             
-            data = [HY, HR, HP, KP, AP, AR];
+            jointData = [HY, HR, HP, KP, AP, AR];
         end
             
     end
